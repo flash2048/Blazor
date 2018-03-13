@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Linq;
 using Microsoft.AspNetCore.Blazor.RenderTree;
 using Microsoft.AspNetCore.Blazor.Test.Helpers;
@@ -284,49 +285,6 @@ namespace Test
                 frames,
                 frame => AssertFrame.Component(frame, "Test.MyComponent", 2, 0),
                 frame => AssertFrame.Attribute(frame, "BoolProperty", true, 1));
-        }
-
-        [Fact]
-        public void Render_ChildComponent_WithChildContent()
-        {
-            // Arrange
-            AdditionalSyntaxTrees.Add(CSharpSyntaxTree.ParseText(@"
-using Microsoft.AspNetCore.Blazor;
-using Microsoft.AspNetCore.Blazor.Components;
-
-namespace Test
-{
-    public class MyComponent : BlazorComponent
-    {
-        public string MyAttr { get; set; }
-
-        public RenderFragment ChildContent { get; set; }
-    }
-}
-"));
-
-            var component = CompileToComponent(@"
-@addTagHelper *, TestAssembly
-<MyComponent MyAttr=""abc"">Some text<some-child a='1'>Nested text</some-child></MyComponent>");
-
-            // Act
-            var frames = GetRenderTree(component);
-
-            // Assert: component frames are correct
-            Assert.Collection(
-                frames,
-                frame => AssertFrame.Component(frame, "Test.MyComponent", 3, 0),
-                frame => AssertFrame.Attribute(frame, "MyAttr", "abc", 1),
-                frame => AssertFrame.Attribute(frame, RenderTreeBuilder.ChildContent, 2));
-
-            // Assert: Captured ChildContent frames are correct
-            var childFrames = GetFrames((RenderFragment)frames[2].AttributeValue);
-            Assert.Collection(
-                childFrames,
-                frame => AssertFrame.Text(frame, "Some text", 3),
-                frame => AssertFrame.Element(frame, "some-child", 3, 4),
-                frame => AssertFrame.Attribute(frame, "a", "1", 5),
-                frame => AssertFrame.Text(frame, "Nested text", 6));
         }
 
         [Fact]
