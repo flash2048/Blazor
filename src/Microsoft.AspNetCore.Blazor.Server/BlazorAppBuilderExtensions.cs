@@ -11,6 +11,9 @@ using System.Net.Mime;
 
 namespace Microsoft.AspNetCore.Builder
 {
+    /// <summary>
+    /// Provides extension methods that add Blazor-related middleware to the ASP.NET pipeline.
+    /// </summary>
     public static class BlazorAppBuilderExtensions
     {
         /// <summary>
@@ -48,6 +51,11 @@ namespace Microsoft.AspNetCore.Builder
                 ContentTypeProvider = CreateContentTypeProvider(),
                 OnPrepareResponse = SetCacheHeaders
             };
+
+            if (env.IsDevelopment() && config.EnableAutoRebuilding)
+            {
+                applicationBuilder.UseAutoRebuild(config);
+            }
 
             // First, match the request against files in the client app dist directory
             applicationBuilder.UseStaticFiles(distDirStaticFiles);

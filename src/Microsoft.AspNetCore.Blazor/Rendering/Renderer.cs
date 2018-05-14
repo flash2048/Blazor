@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Blazor.Components;
 using Microsoft.AspNetCore.Blazor.RenderTree;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Microsoft.AspNetCore.Blazor.Rendering
 {
@@ -23,8 +24,7 @@ namespace Microsoft.AspNetCore.Blazor.Rendering
         private bool _isBatchInProgress;
 
         private int _lastEventHandlerId = 0;
-        private readonly Dictionary<int, UIEventHandler> _eventHandlersById
-            = new Dictionary<int, UIEventHandler>();
+        private readonly Dictionary<int, EventHandlerInvoker> _eventBindings = new Dictionary<int, EventHandlerInvoker>();
 
         /// <summary>
         /// Constructs an instance of <see cref="Renderer"/>.
@@ -72,14 +72,14 @@ namespace Microsoft.AspNetCore.Blazor.Rendering
         /// <param name="eventArgs">Arguments to be passed to the event handler.</param>
         protected void DispatchEvent(int componentId, int eventHandlerId, UIEventArgs eventArgs)
         {
-            if (_eventHandlersById.TryGetValue(eventHandlerId, out var handler))
+            if (_eventBindings.TryGetValue(eventHandlerId, out var binding))
             {
                 // The event handler might request multiple renders in sequence. Capture them
                 // all in a single batch.
                 try
                 {
                     _isBatchInProgress = true;
-                    GetRequiredComponentState(componentId).DispatchEvent(handler, eventArgs);
+                    GetRequiredComponentState(componentId).DispatchEvent(binding, eventArgs);
                 }
                 finally
                 {
@@ -113,7 +113,12 @@ namespace Microsoft.AspNetCore.Blazor.Rendering
         internal void AssignEventHandlerId(ref RenderTreeFrame frame)
         {
             var id = ++_lastEventHandlerId;
-            _eventHandlersById.Add(id, (UIEventHandler)frame.AttributeValue);
+
+            if (frame.AttributeValue is MulticastDelegate @delegate)
+            {
+               _eventBindings.Add(id, new EventHandlerInvoker(@delegate));
+            }
+
             frame = frame.WithAttributeEventHandlerId(id);
         }
 
@@ -159,13 +164,26 @@ namespace Microsoft.AspNetCore.Blazor.Rendering
                     RenderInExistingBatch(nextToRender);
                 }
 
-                UpdateDisplay(_batchBuilder.ToBatch());
+                var batch = _batchBuilder.ToBatch();
+                UpdateDisplay(batch);
+                InvokeRenderCompletedCalls(batch.UpdatedComponents);
             }
             finally
             {
                 RemoveEventHandlerIds(_batchBuilder.DisposedEventHandlerIds.ToRange());
                 _batchBuilder.Clear();
                 _isBatchInProgress = false;
+            }
+        }
+
+        private void InvokeRenderCompletedCalls(ArrayRange<RenderTreeDiff> updatedComponents)
+        {
+            var array = updatedComponents.Array;
+            for (var i = 0; i < updatedComponents.Count; i++)
+            {
+                // The component might be rendered and disposed in the same batch (if its parent
+                // was rendered later in the batch, and removed the child from the tree).
+                GetOptionalComponentState(array[i].ComponentId)?.NotifyRenderCompleted();
             }
         }
 
@@ -190,7 +208,7 @@ namespace Microsoft.AspNetCore.Blazor.Rendering
             var count = eventHandlerIds.Count;
             for (var i = 0; i < count; i++)
             {
-                _eventHandlersById.Remove(array[i]);
+                _eventBindings.Remove(array[i]);
             }
         }
     }

@@ -15,7 +15,7 @@ namespace Microsoft.AspNetCore.Blazor.Razor
         {
             public static readonly string RuntimeName = "Blazor.None";
 
-            public readonly static string TagHelperKind = "Blazor.Bind-0.1";
+            public readonly static string TagHelperKind = "Blazor.Bind";
 
             public readonly static string FallbackKey = "Blazor.Bind.Fallback";
 
@@ -32,8 +32,23 @@ namespace Microsoft.AspNetCore.Blazor.Razor
 
             public static readonly string RuntimeName = "Blazor.IComponent";
 
-            public readonly static string TagHelperKind = "Blazor.Component-0.1";
+            public readonly static string TagHelperKind = "Blazor.Component";
+        }
 
+        public static class EventHandler
+        {
+            public static readonly string EventArgsType = "Blazor.EventHandler.EventArgs";
+
+            public static readonly string RuntimeName = "Blazor.None";
+
+            public readonly static string TagHelperKind = "Blazor.EventHandler";
+        }
+
+        public static class Ref
+        {
+            public readonly static string TagHelperKind = "Blazor.Ref";
+
+            public static readonly string RuntimeName = "Blazor.None";
         }
     }
 }

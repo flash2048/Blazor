@@ -90,5 +90,40 @@ namespace Microsoft.AspNetCore.Blazor.Razor
 
             return !tagHelper.Metadata.ContainsKey(BlazorMetadata.SpecialKindKey);
         }
+
+        public static bool IsEventHandlerTagHelper(this TagHelperDescriptor tagHelper)
+        {
+            if (tagHelper == null)
+            {
+                throw new ArgumentNullException(nameof(tagHelper));
+            }
+
+            return
+                tagHelper.Metadata.TryGetValue(BlazorMetadata.SpecialKindKey, out var kind) &&
+                string.Equals(BlazorMetadata.EventHandler.TagHelperKind, kind);
+        }
+
+        public static bool IsRefTagHelper(this TagHelperDescriptor tagHelper)
+        {
+            if (tagHelper == null)
+            {
+                throw new ArgumentNullException(nameof(tagHelper));
+            }
+
+            return
+                tagHelper.Metadata.TryGetValue(BlazorMetadata.SpecialKindKey, out var kind) &&
+                string.Equals(BlazorMetadata.Ref.TagHelperKind, kind);
+        }
+
+        public static string GetEventArgsType(this TagHelperDescriptor tagHelper)
+        {
+            if (tagHelper == null)
+            {
+                throw new ArgumentNullException(nameof(tagHelper));
+            }
+
+            tagHelper.Metadata.TryGetValue(BlazorMetadata.EventHandler.EventArgsType, out var result);
+            return result;
+        }
     }
 }

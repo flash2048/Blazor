@@ -38,12 +38,14 @@ namespace Microsoft.AspNetCore.Blazor.Routing
         /// Gets or sets the CSS class name applied to the NavLink when the 
         /// current route matches the NavLink href.
         /// </summary>
-        public string ActiveClass { get; set; }
+        [Parameter]
+        string ActiveClass { get; set; }
 
         /// <summary>
         /// Gets or sets a value representing the URL matching behavior.
         /// </summary>
-        public NavLinkMatch Match { get; set; }
+        [Parameter]
+        NavLinkMatch Match { get; set; }
 
         [Inject] private IUriHelper UriHelper { get; set; }
 
@@ -73,6 +75,7 @@ namespace Microsoft.AspNetCore.Blazor.Routing
             _renderHandle.Render(Render);
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             // To avoid leaking memory, it's important to detach any event handlers in Dispose()

@@ -7,13 +7,17 @@ using OpenQA.Selenium;
 using OpenQA.Selenium.Support.UI;
 using System;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Microsoft.AspNetCore.Blazor.E2ETest.Tests
 {
     public class MonoSanityTest : ServerTestBase<AspNetSiteServerFixture>
     {
-        public MonoSanityTest(BrowserFixture browserFixture, AspNetSiteServerFixture serverFixture)
-            : base(browserFixture, serverFixture)
+        public MonoSanityTest(
+            BrowserFixture browserFixture,
+            AspNetSiteServerFixture serverFixture,
+            ITestOutputHelper output)
+            : base(browserFixture, serverFixture, output)
         {
             serverFixture.BuildWebHostMethod = MonoSanity.Program.BuildWebHost;
             Navigate("/", noReload: true);
@@ -120,6 +124,15 @@ namespace Microsoft.AspNetCore.Blazor.E2ETest.Tests
             Browser.FindElement(By.CssSelector("#callJsNoBoxing button")).Click();
 
             Assert.StartsWith(".NET got exception: Division by zero", GetValue(Browser, "callJsNoBoxingResult"));
+        }
+
+        [Fact]
+        public void ReturnsExpectedRuntimeInformation()
+        {
+            Browser.FindElement(By.CssSelector("#getRuntimeInformation button")).Click();
+            Assert.Equal(
+                "OSDescription: 'web'; OSArchitecture: 'X86'; IsOSPlatform(WEBASSEMBLY): 'True'",
+                GetValue(Browser, "getRuntimeInformationResult"));
         }
 
         private static string GetValue(IWebDriver webDriver, string elementId)

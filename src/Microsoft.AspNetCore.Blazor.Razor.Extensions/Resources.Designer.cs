@@ -106,6 +106,15 @@ namespace Microsoft.AspNetCore.Blazor.Razor {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Sets the &apos;{0}&apos; attribute to the provided string or delegate value. A delegate value should be of type &apos;{1}&apos;..
+        /// </summary>
+        internal static string EventHandlerTagHelper_Documentation {
+            get {
+                return ResourceManager.GetString("EventHandlerTagHelper_Documentation", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Declares an interface implementation for the current document..
         /// </summary>
         internal static string ImplementsDirective_Description {
@@ -192,6 +201,15 @@ namespace Microsoft.AspNetCore.Blazor.Razor {
         internal static string PageDirectiveCannotBeImported {
             get {
                 return ResourceManager.GetString("PageDirectiveCannotBeImported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Populates the specified field or property with a reference to the element or component..
+        /// </summary>
+        internal static string RefTagHelper_Documentation {
+            get {
+                return ResourceManager.GetString("RefTagHelper_Documentation", resourceCulture);
             }
         }
     }

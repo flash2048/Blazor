@@ -8,6 +8,7 @@ using OpenQA.Selenium.Support.UI;
 using System;
 using System.Linq;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Microsoft.AspNetCore.Blazor.E2ETest.Tests
 {
@@ -16,8 +17,11 @@ namespace Microsoft.AspNetCore.Blazor.E2ETest.Tests
     {
         private readonly ServerFixture _serverFixture;
 
-        public StandaloneAppTest(BrowserFixture browserFixture, DevHostServerFixture<StandaloneApp.Program> serverFixture)
-            : base(browserFixture, serverFixture)
+        public StandaloneAppTest(
+            BrowserFixture browserFixture, 
+            DevHostServerFixture<StandaloneApp.Program> serverFixture,
+            ITestOutputHelper output)
+            : base(browserFixture, serverFixture, output)
         {
             _serverFixture = serverFixture;
             Navigate("/", noReload: true);
@@ -35,21 +39,11 @@ namespace Microsoft.AspNetCore.Blazor.E2ETest.Tests
         {
             Assert.Equal("Hello, world!", Browser.FindElement(By.TagName("h1")).Text);
         }
-        
-        [Fact]
-        public void ServesStaticAssetsFromClientAppWebRoot()
-        {
-            // Verify that bootstrap.js was loaded
-            var javascriptExecutor = (IJavaScriptExecutor)Browser;
-            var bootstrapTooltipType = javascriptExecutor
-                .ExecuteScript("return typeof (window.Tooltip);");
-            Assert.Equal("function", bootstrapTooltipType);
-        }
 
         [Fact]
         public void NavMenuHighlightsCurrentLocation()
         {
-            var activeNavLinksSelector = By.CssSelector(".main-nav a.active");
+            var activeNavLinksSelector = By.CssSelector(".sidebar a.active");
             var mainHeaderSelector = By.TagName("h1");
 
             // Verify we start at home, with the home link highlighted
@@ -84,7 +78,7 @@ namespace Microsoft.AspNetCore.Blazor.E2ETest.Tests
             Assert.Equal("Current count: 0", countDisplayElement.Text);
 
             // Click the button; see it counts
-            var button = Browser.FindElement(By.CssSelector(".col-sm-9 button"));
+            var button = Browser.FindElement(By.CssSelector(".main button"));
             button.Click();
             button.Click();
             button.Click();

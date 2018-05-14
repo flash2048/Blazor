@@ -39,8 +39,6 @@ namespace Microsoft.AspNetCore.Blazor.Razor
                         node.Children.RemoveAt(i);
                         continue;
                     }
-
-                    node.Children[i] = new ComponentAttributeExtensionNode(propertyNode);
                 }
                 else if (node.Children[i] is TagHelperHtmlAttributeIntermediateNode htmlNode)
                 {
@@ -87,6 +85,13 @@ namespace Microsoft.AspNetCore.Blazor.Razor
                     return false;
                 }
 
+                return true;
+            }
+            else if (node.Children.Count == 1 &&
+                node.Children[0] is CSharpCodeIntermediateNode cSharpCodeNode)
+            {
+                // This is the case when an attribute contains a code block @{ ... }
+                // We don't support this.
                 return true;
             }
             else if (node.Children.Count > 1)

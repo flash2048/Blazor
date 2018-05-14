@@ -49,8 +49,7 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
                 frame => AssertFrame.Whitespace(frame, 3),
                 frame => AssertFrame.Text(frame, "123", 4),
                 frame => AssertFrame.Whitespace(frame, 5),
-                frame => AssertFrame.Text(frame, new object().ToString(), 6),
-                frame => AssertFrame.Whitespace(frame, 7));
+                frame => AssertFrame.Text(frame, new object().ToString(), 6));
         }
 
         [Fact]
@@ -71,9 +70,7 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
             Assert.Collection(frames,
                 frame => AssertFrame.Text(frame, "First", 0),
                 frame => AssertFrame.Text(frame, "Second", 0),
-                frame => AssertFrame.Text(frame, "Third", 0),
-                frame => AssertFrame.Whitespace(frame, 1),
-                frame => AssertFrame.Whitespace(frame, 2));
+                frame => AssertFrame.Text(frame, "Third", 0));
         }
 
         [Fact]
@@ -180,6 +177,22 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
                 frame => AssertFrame.Attribute(frame, "attr", "Hello, WORLD    with number 246!", 1));
         }
 
+        // This test exercises the case where two IntermediateTokens are part of the same expression.
+        // In these case they are split by a comment.
+        [Fact]
+        public void SupportsAttributesWithInterpolatedStringExpressionValues_SplitByComment()
+        {
+            // Arrange/Act
+            var component = CompileToComponent(
+                "@{ var myValue = \"world\"; var myNum=123; }"
+                + "<elem attr=\"Hello, @myValue.ToUpperInvariant()    with number @(myN@* Blazor is Blawesome! *@um*2)!\" />");
+
+            // Assert
+            Assert.Collection(GetRenderTree(component),
+                frame => AssertFrame.Element(frame, "elem", 2, 0),
+                frame => AssertFrame.Attribute(frame, "attr", "Hello, WORLD    with number 246!", 1));
+        }
+
         [Fact]
         public void SupportsAttributesWithInterpolatedTernaryExpressionValues()
         {
@@ -220,7 +233,7 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
                 frame => AssertFrame.Element(frame, "elem", 2, 0),
                 frame => AssertFrame.Attribute(frame, "data-abc", "Hello", 1));
         }
-        
+
         [Fact(Skip = "Currently broken due to #219. TODO: Once the issue is fixed, re-enable this test, remove the test below, and remove the implementation of its workaround.")]
         public void SupportsDataDashAttributesWithCSharpExpressionValues()
         {
@@ -293,38 +306,9 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
                     Assert.Equal(1, frame.Sequence);
                     Assert.NotNull(frame.AttributeValue);
 
-                    ((UIEventHandler)frame.AttributeValue)(null);
+                    ((Action<UIEventArgs>)frame.AttributeValue)(null);
                     Assert.True((bool)handlerWasCalledProperty.GetValue(component));
-                },
-                frame => AssertFrame.Whitespace(frame, 2));
-        }
-
-        [Fact]
-        public void SupportsAttributesWithCSharpCodeBlockValues()
-        {
-            // Arrange/Act
-            var component = CompileToComponent(
-                @"<elem attr=@{ DidInvokeCode = true; } />
-                @functions {
-                    public bool DidInvokeCode { get; set; } = false;
-                }");
-            var didInvokeCodeProperty = component.GetType().GetProperty("DidInvokeCode");
-            var frames = GetRenderTree(component);
-
-            // Assert
-            Assert.False((bool)didInvokeCodeProperty.GetValue(component));
-            Assert.Collection(frames,
-                frame => AssertFrame.Element(frame, "elem", 2, 0),
-                frame =>
-                {
-                    Assert.Equal(RenderTreeFrameType.Attribute, frame.FrameType);
-                    Assert.NotNull(frame.AttributeValue);
-                    Assert.Equal(1, frame.Sequence);
-
-                    ((UIEventHandler)frame.AttributeValue)(null);
-                    Assert.True((bool)didInvokeCodeProperty.GetValue(component));
-                },
-                frame => AssertFrame.Whitespace(frame, 2));
+                });
         }
 
         [Fact]
@@ -338,39 +322,7 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
 
             // Assert
             Assert.Collection(frames,
-                frame => AssertFrame.Whitespace(frame, 0),
-                frame => AssertFrame.Text(frame, typeof(List<string>).FullName, 1));
-        }
-
-        [Fact]
-        public void SupportsAttributeFramesEvaluatedInline()
-        {
-            // Arrange/Act
-            var component = CompileToComponent(
-                @"<elem @onclick(MyHandler) />
-                @functions {
-                    public bool DidInvokeCode { get; set; } = false;
-                    void MyHandler()
-                    {
-                        DidInvokeCode = true;
-                    }
-                }");
-            var didInvokeCodeProperty = component.GetType().GetProperty("DidInvokeCode");
-
-            // Assert
-            Assert.False((bool)didInvokeCodeProperty.GetValue(component));
-            Assert.Collection(GetRenderTree(component),
-                frame => AssertFrame.Element(frame, "elem", 2, 0),
-                frame =>
-                {
-                    Assert.Equal(RenderTreeFrameType.Attribute, frame.FrameType);
-                    Assert.NotNull(frame.AttributeValue);
-                    Assert.Equal(1, frame.Sequence);
-
-                    ((UIEventHandler)frame.AttributeValue)(null);
-                    Assert.True((bool)didInvokeCodeProperty.GetValue(component));
-                },
-                frame => AssertFrame.Whitespace(frame, 2));
+                frame => AssertFrame.Text(frame, typeof(List<string>).FullName, 0));
         }
 
         [Fact]
@@ -394,13 +346,41 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
                     AssertFrame.Attribute(frame, "onchange", 2);
 
                     // Trigger the change event to show it updates the property
-                    ((UIEventHandler)frame.AttributeValue)(new UIChangeEventArgs
+                    ((Action<UIEventArgs>)frame.AttributeValue)(new UIChangeEventArgs
                     {
                         Value = "Modified value"
                     });
                     Assert.Equal("Modified value", myValueProperty.GetValue(component));
-                },
-                frame => AssertFrame.Text(frame, "\n", 3));
+                });
+        }
+
+        [Fact]
+        public void SupportsTwoWayBindingForTextareas()
+        {
+            // Arrange/Act
+            var component = CompileToComponent(
+                @"<textarea bind=""MyValue"" ></textarea>
+                @functions {
+                    public string MyValue { get; set; } = ""Initial value"";
+                }");
+            var myValueProperty = component.GetType().GetProperty("MyValue");
+
+            // Assert
+            var frames = GetRenderTree(component);
+            Assert.Collection(frames,
+                frame => AssertFrame.Element(frame, "textarea", 3, 0),
+                frame => AssertFrame.Attribute(frame, "value", "Initial value", 1),
+                frame =>
+                {
+                    AssertFrame.Attribute(frame, "onchange", 2);
+
+                    // Trigger the change event to show it updates the property
+                    ((Action<UIEventArgs>)frame.AttributeValue)(new UIChangeEventArgs
+                    {
+                        Value = "Modified value"
+                    });
+                    Assert.Equal("Modified value", myValueProperty.GetValue(component));
+                });
         }
 
         [Fact]
@@ -425,13 +405,12 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
 
                     // Trigger the change event to show it updates the property
                     var newDateValue = new DateTime(2018, 3, 5, 4, 5, 6);
-                    ((UIEventHandler)frame.AttributeValue)(new UIChangeEventArgs
+                    ((Action<UIEventArgs>)frame.AttributeValue)(new UIChangeEventArgs
                     {
                         Value = newDateValue.ToString()
                     });
                     Assert.Equal(newDateValue, myDateProperty.GetValue(component));
-                },
-                frame => AssertFrame.Text(frame, "\n", 3));
+                });
         }
 
         [Fact]
@@ -456,13 +435,89 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
                     AssertFrame.Attribute(frame, "onchange", 2);
 
                     // Trigger the change event to show it updates the property
-                    ((UIEventHandler)frame.AttributeValue)(new UIChangeEventArgs
+                    ((Action<UIEventArgs>)frame.AttributeValue)(new UIChangeEventArgs
                     {
                         Value = new DateTime(2018, 3, 5).ToString(testDateFormat)
                     });
                     Assert.Equal(new DateTime(2018, 3, 5), myDateProperty.GetValue(component));
-                },
-                frame => AssertFrame.Text(frame, "\n", 3));
+                });
+        }
+
+        [Fact] // In this case, onclick is just a normal HTML attribute
+        public void SupportsEventHandlerWithString()
+        {
+            // Arrange
+            var component = CompileToComponent(@"
+<button onclick=""function(){console.log('hello');};"" />");
+
+            // Act
+            var frames = GetRenderTree(component);
+
+            // Assert
+            Assert.Collection(frames,
+                frame => AssertFrame.Element(frame, "button", 2, 0),
+                frame => AssertFrame.Attribute(frame, "onclick", "function(){console.log('hello');};", 1));
+        }
+
+        [Fact]
+        public void SupportsEventHandlerWithLambda()
+        {
+            // Arrange
+            var component = CompileToComponent(@"
+<button onclick=""@(x => Clicked = true)"" />
+@functions {
+    public bool Clicked { get; set; }
+}");
+
+            var clicked = component.GetType().GetProperty("Clicked");
+
+            // Act
+            var frames = GetRenderTree(component);
+
+            // Assert
+            Assert.Collection(frames,
+                frame => AssertFrame.Element(frame, "button", 2, 0),
+                frame =>
+                {
+                    AssertFrame.Attribute(frame, "onclick", 1);
+
+                    var func = Assert.IsType<Action<UIMouseEventArgs>>(frame.AttributeValue);
+                    Assert.False((bool)clicked.GetValue(component));
+
+                    func(new UIMouseEventArgs());
+                    Assert.True((bool)clicked.GetValue(component));
+                });
+        }
+
+        [Fact]
+        public void SupportsEventHandlerWithMethodGroup()
+        {
+            // Arrange
+            var component = CompileToComponent(@"
+<button onclick=""@OnClick"" />
+@functions {
+    public void OnClick(UIMouseEventArgs e) { Clicked = true; }
+    public bool Clicked { get; set; }
+}");
+
+            var clicked = component.GetType().GetProperty("Clicked");
+
+            // Act
+            var frames = GetRenderTree(component);
+
+            // Assert
+            Assert.Collection(frames,
+                frame => AssertFrame.Element(frame, "button", 2, 0),
+                frame =>
+                {
+                    AssertFrame.Attribute(frame, "onclick", 1);
+
+                    var func = Assert.IsType<Action<UIMouseEventArgs>>(frame.AttributeValue);
+                    Assert.False((bool)clicked.GetValue(component));
+
+                    func(new UIMouseEventArgs());
+                    Assert.True((bool)clicked.GetValue(component));
+                });
         }
 
         [Fact]
@@ -486,13 +541,12 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
                     AssertFrame.Attribute(frame, "onchange", 2);
 
                     // Trigger the change event to show it updates the property
-                    ((UIEventHandler)frame.AttributeValue)(new UIChangeEventArgs
+                    ((Action<UIEventArgs>)frame.AttributeValue)(new UIChangeEventArgs
                     {
                         Value = false
                     });
                     Assert.False((bool)myValueProperty.GetValue(component));
-                },
-                frame => AssertFrame.Text(frame, "\n", 3));
+                });
         }
 
         [Fact]
@@ -517,13 +571,12 @@ namespace Microsoft.AspNetCore.Blazor.Build.Test
                     AssertFrame.Attribute(frame, "onchange", 2);
 
                     // Trigger the change event to show it updates the property
-                    ((UIEventHandler)frame.AttributeValue)(new UIChangeEventArgs
+                    ((Action<UIEventArgs>)frame.AttributeValue)(new UIChangeEventArgs
                     {
                         Value = MyEnum.SecondValue.ToString()
                     });
                     Assert.Equal(MyEnum.SecondValue, (MyEnum)myValueProperty.GetValue(component));
-                },
-                frame => AssertFrame.Text(frame, "\n", 3));
+                });
         }
 
         public enum MyEnum { FirstValue, SecondValue }

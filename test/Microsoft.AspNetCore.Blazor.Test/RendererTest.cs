@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Blazor.Components;
 using Microsoft.AspNetCore.Blazor.Rendering;
 using Microsoft.AspNetCore.Blazor.RenderTree;
@@ -170,7 +171,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
 
             var component = new EventComponent
             {
-                Handler = args => { receivedArgs = args; }
+                OnTest = args => { receivedArgs = args; }
             };
             var componentId = renderer.AssignComponentId(component);
             component.TriggerRender();
@@ -187,6 +188,62 @@ namespace Microsoft.AspNetCore.Blazor.Test
             var eventArgs = new UIEventArgs();
             renderer.DispatchEvent(componentId, eventHandlerId, eventArgs);
             Assert.Same(eventArgs, receivedArgs);
+        }
+
+        [Fact]
+        public void CanDispatchTypedEventsToTopLevelComponents()
+        {
+            // Arrange: Render a component with an event handler
+            var renderer = new TestRenderer();
+            UIMouseEventArgs receivedArgs = null;
+
+            var component = new EventComponent
+            {
+                OnClick = args => { receivedArgs = args; }
+            };
+            var componentId = renderer.AssignComponentId(component);
+            component.TriggerRender();
+
+            var eventHandlerId = renderer.Batches.Single()
+                .ReferenceFrames
+                .First(frame => frame.AttributeValue != null)
+                .AttributeEventHandlerId;
+
+            // Assert: Event not yet fired
+            Assert.Null(receivedArgs);
+
+            // Act/Assert: Event can be fired
+            var eventArgs = new UIMouseEventArgs();
+            renderer.DispatchEvent(componentId, eventHandlerId, eventArgs);
+            Assert.Same(eventArgs, receivedArgs);
+        }
+
+        [Fact]
+        public void CanDispatchActionEventsToTopLevelComponents()
+        {
+            // Arrange: Render a component with an event handler
+            var renderer = new TestRenderer();
+            object receivedArgs = null;
+
+            var component = new EventComponent
+            {
+                OnClickAction = () => { receivedArgs = new object(); }
+            };
+            var componentId = renderer.AssignComponentId(component);
+            component.TriggerRender();
+
+            var eventHandlerId = renderer.Batches.Single()
+                .ReferenceFrames
+                .First(frame => frame.AttributeValue != null)
+                .AttributeEventHandlerId;
+
+            // Assert: Event not yet fired
+            Assert.Null(receivedArgs);
+
+            // Act/Assert: Event can be fired
+            var eventArgs = new UIMouseEventArgs();
+            renderer.DispatchEvent(componentId, eventHandlerId, eventArgs);
+            Assert.NotNull(receivedArgs);
         }
 
         [Fact]
@@ -209,7 +266,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
                 .ReferenceFrames
                 .Single(frame => frame.FrameType == RenderTreeFrameType.Component);
             var nestedComponent = (EventComponent)nestedComponentFrame.Component;
-            nestedComponent.Handler = args => { receivedArgs = args; };
+            nestedComponent.OnTest = args => { receivedArgs = args; };
             var nestedComponentId = nestedComponentFrame.ComponentId;
             nestedComponent.TriggerRender();
 
@@ -233,11 +290,11 @@ namespace Microsoft.AspNetCore.Blazor.Test
         {
             // Arrange: Render a component with an event handler
             var renderer = new TestRenderer();
-            UIEventHandler handler = args => throw new NotImplementedException();
+            Action<UIEventArgs> handler = args => throw new NotImplementedException();
             var component = new TestComponent(builder =>
             {
                 builder.OpenElement(0, "mybutton");
-                builder.AddAttribute(1, "my click event", handler);
+                builder.AddAttribute(1, "onclick", handler);
                 builder.CloseElement();
             });
 
@@ -475,8 +532,8 @@ namespace Microsoft.AspNetCore.Blazor.Test
             // Arrange
             var renderer = new TestRenderer();
             var eventCount = 0;
-            UIEventHandler origEventHandler = args => { eventCount++; };
-            var component = new EventComponent { Handler = origEventHandler };
+            Action<UIEventArgs> origEventHandler = args => { eventCount++; };
+            var component = new EventComponent { OnTest = origEventHandler };
             var componentId = renderer.AssignComponentId(component);
             component.TriggerRender();
             var origEventHandlerId = renderer.Batches.Single()
@@ -492,7 +549,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
 
             // Now change the attribute value
             var newEventCount = 0;
-            component.Handler = args => { newEventCount++; };
+            component.OnTest = args => { newEventCount++; };
             component.TriggerRender();
 
             // Act/Assert 2: Can no longer fire the original event, but can fire the new event
@@ -512,8 +569,8 @@ namespace Microsoft.AspNetCore.Blazor.Test
             // Arrange
             var renderer = new TestRenderer();
             var eventCount = 0;
-            UIEventHandler origEventHandler = args => { eventCount++; };
-            var component = new EventComponent { Handler = origEventHandler };
+            Action<UIEventArgs> origEventHandler = args => { eventCount++; };
+            var component = new EventComponent { OnTest = origEventHandler };
             var componentId = renderer.AssignComponentId(component);
             component.TriggerRender();
             var origEventHandlerId = renderer.Batches.Single()
@@ -528,7 +585,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
             Assert.Equal(1, eventCount);
 
             // Now remove the event attribute
-            component.Handler = null;
+            component.OnTest = null;
             component.TriggerRender();
 
             // Act/Assert 2: Can no longer fire the original event
@@ -545,13 +602,13 @@ namespace Microsoft.AspNetCore.Blazor.Test
             // Arrange
             var renderer = new TestRenderer();
             var eventCount = 0;
-            UIEventHandler origEventHandler = args => { eventCount++; };
+            Action<UIEventArgs> origEventHandler = args => { eventCount++; };
             var component = new ConditionalParentComponent<EventComponent>
             {
                 IncludeChild = true,
                 ChildParameters = new Dictionary<string, object>
                 {
-                    { nameof(EventComponent.Handler), origEventHandler }
+                    { nameof(EventComponent.OnTest), origEventHandler }
                 }
             };
             var rootComponentId = renderer.AssignComponentId(component);
@@ -594,8 +651,8 @@ namespace Microsoft.AspNetCore.Blazor.Test
             // Arrange
             var renderer = new TestRenderer();
             var eventCount = 0;
-            UIEventHandler origEventHandler = args => { eventCount++; };
-            var component = new EventComponent { Handler = origEventHandler };
+            Action<UIEventArgs> origEventHandler = args => { eventCount++; };
+            var component = new EventComponent { OnTest = origEventHandler };
             var componentId = renderer.AssignComponentId(component);
             component.TriggerRender();
             var origEventHandlerId = renderer.Batches.Single()
@@ -634,7 +691,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
             {
                 builder.AddContent(0, "Child event count: " + eventCount);
                 builder.OpenComponent<EventComponent>(1);
-                builder.AddAttribute(2, nameof(EventComponent.Handler), args =>
+                builder.AddAttribute(2, nameof(EventComponent.OnTest), args =>
                 {
                     eventCount++;
                     rootComponent.TriggerRender();
@@ -822,7 +879,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
                 if (shouldRenderChild)
                 {
                     builder.OpenComponent<RendersSelfAfterEventComponent>(1);
-                    builder.AddAttribute(2, nameof(RendersSelfAfterEventComponent.OnClick), (Action)(() =>
+                    builder.AddAttribute(2, "onclick", (Action<object>)((object obj) =>
                     {
                         // First we queue (1) a re-render of the root component, then the child component
                         // will queue (2) its own re-render. But by the time (1) completes, the child will
@@ -843,7 +900,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
                 .ComponentId;
             var origEventHandlerId = renderer.Batches.Single()
                 .ReferenceFrames
-                .Where(f => f.FrameType == RenderTreeFrameType.Attribute)
+                .Where(f => f.FrameType == RenderTreeFrameType.Attribute && f.AttributeName == "onclick")
                 .Single(f => f.AttributeEventHandlerId != 0)
                 .AttributeEventHandlerId;
 
@@ -861,6 +918,157 @@ namespace Microsoft.AspNetCore.Blazor.Test
                     Assert.Equal(RenderTreeEditType.RemoveFrame, edit.Type);
                     Assert.Equal(1, edit.SiblingIndex);
                 });
+        }
+
+        [Fact]
+        public void CanCombineBindAndConditionalAttribute()
+        {
+            // This test represents https://github.com/aspnet/Blazor/issues/624
+
+            // Arrange: Rendered with textbox enabled
+            var renderer = new TestRenderer();
+            var component = new BindPlusConditionalAttributeComponent();
+            var componentId = renderer.AssignComponentId(component);
+            component.TriggerRender();
+            var checkboxChangeEventHandlerId = renderer.Batches.Single()
+                .ReferenceFrames
+                .First(frame => frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeEventHandlerId != 0)
+                .AttributeEventHandlerId;
+
+            // Act: Toggle the checkbox
+            var eventArgs = new UIChangeEventArgs { Value = true };
+            renderer.DispatchEvent(componentId, checkboxChangeEventHandlerId, eventArgs);
+            var latestBatch = renderer.Batches.Last();
+            var latestDiff = latestBatch.DiffsInOrder.Single();
+            var referenceFrames = latestBatch.ReferenceFrames;
+
+            // Assert: Textbox's "disabled" attribute was removed
+            Assert.Equal(2, renderer.Batches.Count);
+            Assert.Equal(componentId, latestDiff.ComponentId);
+            Assert.Contains(latestDiff.Edits, edit =>
+                edit.SiblingIndex == 1
+                && edit.RemovedAttributeName == "disabled");
+        }
+
+        [Fact]
+        public void HandlesNestedElementCapturesDuringRefresh()
+        {
+            // This may seem like a very arbitrary test case, but at once stage there was a bug
+            // whereby the diff output was incorrect given a ref capture on an element whose
+            // parent element also had a ref capture
+
+            // Arrange
+            var attrValue = 0;
+            var component = new TestComponent(builder =>
+            {
+                builder.OpenElement(0, "parent elem");
+                builder.AddAttribute(1, "parent elem attr", attrValue);
+                builder.AddElementReferenceCapture(2, _ => { });
+                builder.OpenElement(3, "child elem");
+                builder.AddElementReferenceCapture(4, _ => { });
+                builder.AddContent(5, "child text");
+                builder.CloseElement();
+                builder.CloseElement();
+            });
+            var renderer = new TestRenderer();
+            renderer.AssignComponentId(component);
+
+            // Act: Update the attribute value on the parent
+            component.TriggerRender();
+            attrValue++;
+            component.TriggerRender();
+
+            // Assert
+            var latestBatch = renderer.Batches.Skip(1).Single();
+            var latestDiff = latestBatch.DiffsInOrder.Single();
+            Assert.Collection(latestDiff.Edits,
+                edit =>
+                {
+                    Assert.Equal(RenderTreeEditType.SetAttribute, edit.Type);
+                    Assert.Equal(0, edit.SiblingIndex);
+                    AssertFrame.Attribute(latestBatch.ReferenceFrames[edit.ReferenceFrameIndex],
+                        "parent elem attr", 1);
+                });
+        }
+
+        [Fact]
+        public void CallsAfterRenderOnEachRender()
+        {
+            // Arrange
+            var onAfterRenderCallCountLog = new List<int>();
+            var component = new AfterRenderCaptureComponent();
+            var renderer = new TestRenderer
+            {
+                OnUpdateDisplay = _ => onAfterRenderCallCountLog.Add(component.OnAfterRenderCallCount)
+            };
+            renderer.AssignComponentId(component);
+
+            // Act
+            component.TriggerRender();
+
+            // Assert
+            // When the display was first updated, OnAfterRender had not yet been called
+            Assert.Equal(new[] { 0 }, onAfterRenderCallCountLog);
+            // But OnAfterRender was called since then
+            Assert.Equal(1, component.OnAfterRenderCallCount);
+
+            // Act/Assert 2: On a subsequent render, the same happens again
+            component.TriggerRender();
+            Assert.Equal(new[] { 0, 1 }, onAfterRenderCallCountLog);
+            Assert.Equal(2, component.OnAfterRenderCallCount);
+        }
+
+        [Fact]
+        public void DoesNotCallOnAfterRenderForComponentsNotRendered()
+        {
+            // Arrange
+            var showComponent3 = true;
+            var parentComponent = new TestComponent(builder =>
+            {
+                // First child will be re-rendered because we'll change its param
+                builder.OpenComponent<AfterRenderCaptureComponent>(0);
+                builder.AddAttribute(1, "some param", showComponent3);
+                builder.CloseComponent();
+
+                // Second child will not be re-rendered because nothing changes
+                builder.OpenComponent<AfterRenderCaptureComponent>(2);
+                builder.CloseComponent();
+
+                // Third component will be disposed
+                if (showComponent3)
+                {
+                    builder.OpenComponent<AfterRenderCaptureComponent>(3);
+                    builder.CloseComponent();
+                }
+            });
+            var renderer = new TestRenderer();
+            var parentComponentId = renderer.AssignComponentId(parentComponent);
+
+            // Act: First render
+            parentComponent.TriggerRender();
+
+            // Assert: All child components were notified of "after render"
+            var batch1 = renderer.Batches.Single();
+            var parentComponentEdits1 = batch1.DiffsByComponentId[parentComponentId].Single().Edits;
+            var childComponents = parentComponentEdits1
+                .Select(
+                    edit => (AfterRenderCaptureComponent)batch1.ReferenceFrames[edit.ReferenceFrameIndex].Component)
+                .ToArray();
+            Assert.Equal(1, childComponents[0].OnAfterRenderCallCount);
+            Assert.Equal(1, childComponents[1].OnAfterRenderCallCount);
+            Assert.Equal(1, childComponents[2].OnAfterRenderCallCount);
+
+            // Act: Second render
+            showComponent3 = false;
+            parentComponent.TriggerRender();
+
+            // Assert: Only the re-rendered component was notified of "after render"
+            var batch2 = renderer.Batches.Skip(1).Single();
+            Assert.Equal(2, batch2.DiffsInOrder.Count); // Parent and first child
+            Assert.Equal(1, batch2.DisposedComponentIDs.Count); // Third child
+            Assert.Equal(2, childComponents[0].OnAfterRenderCallCount); // Retained and re-rendered
+            Assert.Equal(1, childComponents[1].OnAfterRenderCallCount); // Retained and not re-rendered
+            Assert.Equal(1, childComponents[2].OnAfterRenderCallCount); // Disposed
         }
 
         private class NoOpRenderer : Renderer
@@ -901,7 +1109,8 @@ namespace Microsoft.AspNetCore.Blazor.Test
 
         private class MessageComponent : AutoRenderComponent
         {
-            public string Message { get; set; }
+            [Parameter]
+            internal string Message { get; set; }
 
             protected override void BuildRenderTree(RenderTreeBuilder builder)
             {
@@ -911,9 +1120,15 @@ namespace Microsoft.AspNetCore.Blazor.Test
 
         private class FakeComponent : IComponent
         {
-            public int IntProperty { get; set; }
-            public string StringProperty { get; set; }
-            public object ObjectProperty { get; set; }
+            [Parameter]
+            internal int IntProperty { get; private set; }
+
+            [Parameter]
+            internal string StringProperty { get; private set; }
+
+            [Parameter]
+            internal object ObjectProperty { get; set; }
+
             public RenderHandle RenderHandle { get; private set; }
 
             public void Init(RenderHandle renderHandle)
@@ -925,7 +1140,15 @@ namespace Microsoft.AspNetCore.Blazor.Test
 
         private class EventComponent : AutoRenderComponent, IComponent, IHandleEvent
         {
-            public UIEventHandler Handler { get; set; }
+            [Parameter]
+            internal Action<UIEventArgs> OnTest { get; set; }
+
+            [Parameter]
+            internal Action<UIMouseEventArgs> OnClick { get; set; }
+
+            [Parameter]
+            internal Action OnClickAction { get; set; }
+
             public bool SkipElement { get; set; }
             private int renderCount = 0;
 
@@ -936,25 +1159,38 @@ namespace Microsoft.AspNetCore.Blazor.Test
                 {
                     builder.OpenElement(1, "parent");
                     builder.OpenElement(2, "some element");
-                    if (Handler != null)
+                    if (OnTest != null)
                     {
-                        builder.AddAttribute(3, "some event", Handler);
+                        builder.AddAttribute(3, "ontest", OnTest);
+                    }
+                    if (OnClick != null)
+                    {
+                        builder.AddAttribute(4, "onclick", OnClick);
+                    }
+                    if (OnClickAction != null)
+                    {
+                        builder.AddAttribute(5, "onclickaction", OnClickAction);
                     }
                     builder.CloseElement();
                     builder.CloseElement();
                 }
                 builder.CloseElement();
-                builder.AddContent(4, $"Render count: {++renderCount}");
+                builder.AddContent(6, $"Render count: {++renderCount}");
             }
 
-            public void HandleEvent(UIEventHandler handler, UIEventArgs args)
-                => handler(args);
+            public void HandleEvent(EventHandlerInvoker binding, UIEventArgs args)
+            {
+                binding.Invoke(args);
+            }
         }
 
         private class ConditionalParentComponent<T> : AutoRenderComponent where T : IComponent
         {
-            public bool IncludeChild { get; set; }
-            public IDictionary<string, object> ChildParameters { get; set; }
+            [Parameter]
+            internal bool IncludeChild { get; set; }
+
+            [Parameter]
+            internal IDictionary<string, object> ChildParameters { get; set; }
 
             protected override void BuildRenderTree(RenderTreeBuilder builder)
             {
@@ -978,7 +1214,9 @@ namespace Microsoft.AspNetCore.Blazor.Test
         
         private class ReRendersParentComponent : AutoRenderComponent
         {
-            public TestComponent Parent { get; set; }
+            [Parameter]
+            internal TestComponent Parent { get; private set; }
+
             private bool _isFirstTime = true;
 
             protected override void BuildRenderTree(RenderTreeBuilder builder)
@@ -995,7 +1233,8 @@ namespace Microsoft.AspNetCore.Blazor.Test
 
         private class RendersSelfAfterEventComponent : IComponent, IHandleEvent
         {
-            public Action OnClick { get; set; }
+            [Parameter]
+            Action<object> OnClick { get; set; }
 
             private RenderHandle _renderHandle;
 
@@ -1008,9 +1247,9 @@ namespace Microsoft.AspNetCore.Blazor.Test
                 Render();
             }
 
-            public void HandleEvent(UIEventHandler handler, UIEventArgs args)
+            public void HandleEvent(EventHandlerInvoker binding, UIEventArgs args)
             {
-                handler(args);
+                var task = binding.Invoke(args);
                 Render();
             }
 
@@ -1018,7 +1257,7 @@ namespace Microsoft.AspNetCore.Blazor.Test
                 => _renderHandle.Render(builder =>
                 {
                     builder.OpenElement(0, "my button");
-                    builder.AddAttribute(1, "my click handler", eventArgs => OnClick());
+                    builder.AddAttribute(1, "my click handler", eventArgs => OnClick(eventArgs));
                     builder.CloseElement();
                 });
         }
@@ -1044,6 +1283,51 @@ namespace Microsoft.AspNetCore.Blazor.Test
                         builder.AddContent(0, $"Hello from {nameof(MultiRendererComponent)}");
                     });
                 }
+            }
+        }
+
+        private class BindPlusConditionalAttributeComponent : AutoRenderComponent, IHandleEvent
+        {
+            public bool CheckboxEnabled;
+            public string SomeStringProperty;
+
+            public void HandleEvent(EventHandlerInvoker binding, UIEventArgs args)
+            {
+                binding.Invoke(args);
+                TriggerRender();
+            }
+
+            protected override void BuildRenderTree(RenderTreeBuilder builder)
+            {
+                builder.OpenElement(0, "input");
+                builder.AddAttribute(1, "type", "checkbox");
+                builder.AddAttribute(2, "value", BindMethods.GetValue(CheckboxEnabled));
+                builder.AddAttribute(3, "onchange", BindMethods.SetValueHandler(__value => CheckboxEnabled = __value, CheckboxEnabled));
+                builder.CloseElement();
+                builder.OpenElement(4, "input");
+                builder.AddAttribute(5, "value", BindMethods.GetValue(SomeStringProperty));
+                builder.AddAttribute(6, "onchange", BindMethods.SetValueHandler(__value => SomeStringProperty = __value, SomeStringProperty));
+                builder.AddAttribute(7, "disabled", !CheckboxEnabled);
+                builder.CloseElement();
+            }
+        }
+
+        private class AfterRenderCaptureComponent : AutoRenderComponent, IComponent, IHandleAfterRender
+        {
+            public int OnAfterRenderCallCount { get; private set; }
+
+            public void OnAfterRender()
+            {
+                OnAfterRenderCallCount++;
+            }
+
+            void IComponent.SetParameters(ParameterCollection parameters)
+            {
+                TriggerRender();
+            }
+
+            protected override void BuildRenderTree(RenderTreeBuilder builder)
+            {
             }
         }
     }
