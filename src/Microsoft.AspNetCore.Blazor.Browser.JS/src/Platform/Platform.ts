@@ -1,4 +1,4 @@
-﻿export interface Platform {
+export interface Platform {
   start(loadAssemblyUrls: string[]): Promise<void>;
 
   callEntryPoint(assemblyName: string, entrypointMethod: string, args: (System_Object | null)[]);
@@ -7,6 +7,8 @@
 
   toJavaScriptString(dotNetString: System_String): string;
   toDotNetString(javaScriptString: string): System_String;
+
+  toUint8Array(array: System_Array<any>): Uint8Array;
 
   getArrayLength(array: System_Array<any>): number;
   getArrayEntryPtr<TPtr extends Pointer>(array: System_Array<TPtr>, index: number, itemSize: number): TPtr;

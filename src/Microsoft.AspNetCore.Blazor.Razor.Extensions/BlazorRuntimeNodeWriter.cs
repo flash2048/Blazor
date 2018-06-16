@@ -160,6 +160,8 @@ namespace Microsoft.AspNetCore.Blazor.Razor
                 throw new ArgumentNullException(nameof(node));
             }
 
+            _scopeStack.IncrementCurrentScopeChildCount(context);
+
             context.CodeWriter
                 .WriteStartMethodInvocation($"{_scopeStack.BuilderVarName}.{nameof(BlazorApi.RenderTreeBuilder.OpenElement)}")
                 .Write((_sourceSequence++).ToString())
@@ -355,7 +357,8 @@ namespace Microsoft.AspNetCore.Blazor.Razor
             else if (node.Children.Count == 1 && node.Children[0] is HtmlContentIntermediateNode htmlNode)
             {
                 // This is how string attributes are lowered by default, a single HTML node with a single HTML token.
-                context.CodeWriter.WriteStringLiteral(((IntermediateToken)htmlNode.Children[0]).Content);
+                var content = string.Join(string.Empty, GetHtmlTokens(htmlNode).Select(t => t.Content));
+                context.CodeWriter.WriteStringLiteral(content);
             }
             else
             {
@@ -376,9 +379,23 @@ namespace Microsoft.AspNetCore.Blazor.Razor
                 }
                 else
                 {
+                    if (node.BoundAttribute != null)
+                    {
+                        context.CodeWriter.Write(BlazorApi.RuntimeHelpers.TypeCheck);
+                        context.CodeWriter.Write("<");
+                        context.CodeWriter.Write(node.BoundAttribute.TypeName);
+                        context.CodeWriter.Write(">");
+                        context.CodeWriter.Write("(");
+                    }
+
                     for (var i = 0; i < tokens.Count; i++)
                     {
                         context.CodeWriter.Write(tokens[i].Content);
+                    }
+
+                    if (node.BoundAttribute != null)
+                    {
+                        context.CodeWriter.Write(")");
                     }
                 }
             }
@@ -390,6 +407,12 @@ namespace Microsoft.AspNetCore.Blazor.Razor
             {
                 // We generally expect all children to be CSharp, this is here just in case.
                 return attribute.FindDescendantNodes<IntermediateToken>().Where(t => t.IsCSharp).ToArray();
+            }
+
+            IReadOnlyList<IntermediateToken> GetHtmlTokens(HtmlContentIntermediateNode html)
+            {
+                // We generally expect all children to be HTML, this is here just in case.
+                return html.FindDescendantNodes<IntermediateToken>().Where(t => t.IsHtml).ToArray();
             }
         }
 
@@ -435,15 +458,6 @@ namespace Microsoft.AspNetCore.Blazor.Razor
 
         public override void BeginWriteAttribute(CodeWriter codeWriter, string key)
         {
-            // Temporary workaround for https://github.com/aspnet/Blazor/issues/219
-            // Remove this logic once the underlying HTML parsing issue is fixed,
-            // as we don't really want special cases like this.
-            const string dataUnderscore = "data_";
-            if (key.StartsWith(dataUnderscore, StringComparison.Ordinal))
-            {
-                key = "data-" + key.Substring(dataUnderscore.Length);
-            }
-
             codeWriter
                 .WriteStartMethodInvocation($"{_scopeStack.BuilderVarName}.{nameof(BlazorApi.RenderTreeBuilder.AddAttribute)}")
                 .Write((_sourceSequence++).ToString())

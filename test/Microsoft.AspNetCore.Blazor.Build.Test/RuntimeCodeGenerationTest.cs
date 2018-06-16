@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Linq;
@@ -236,6 +236,35 @@ namespace Test
         }
 
         [Fact]
+        public void ChildComponent_WithElementOnlyChildContent()
+        {
+            // Arrange
+            AdditionalSyntaxTrees.Add(Parse(@"
+using Microsoft.AspNetCore.Blazor;
+using Microsoft.AspNetCore.Blazor.Components;
+
+namespace Test
+{
+    public class MyComponent : BlazorComponent
+    {
+        [Parameter]
+        RenderFragment ChildContent { get; set; }
+    }
+}
+"));
+
+            // Act
+            var generated = CompileToCSharp(@"
+@addTagHelper *, TestAssembly
+<MyComponent><child>hello</child></MyComponent>");
+
+            // Assert
+            AssertDocumentNodeMatchesBaseline(generated.CodeDocument);
+            AssertCSharpDocumentMatchesBaseline(generated.CodeDocument);
+            CompileToAssembly(generated);
+        }
+
+        [Fact]
         public void ChildComponent_WithPageDirective()
         {
             // Arrange
@@ -261,6 +290,39 @@ namespace Test
             AssertDocumentNodeMatchesBaseline(generated.CodeDocument);
             AssertCSharpDocumentMatchesBaseline(generated.CodeDocument);
             CompileToAssembly(generated);
+        }
+
+        [Fact]
+        public void ComponentParameter_TypeMismatch_ReportsDiagnostic()
+        {
+            // Arrange
+            AdditionalSyntaxTrees.Add(Parse(@"
+using Microsoft.AspNetCore.Blazor.Components;
+
+namespace Test
+{
+    public class CoolnessMeter : BlazorComponent
+    {
+        [Parameter] private int Coolness { get; set; }
+    }
+}
+"));
+
+            // Act
+            var generated = CompileToCSharp(@"
+@addTagHelper *, TestAssembly
+<CoolnessMeter Coolness=""@(""very-cool"")"" />
+");
+
+            // Assert
+            AssertDocumentNodeMatchesBaseline(generated.CodeDocument);
+            AssertCSharpDocumentMatchesBaseline(generated.CodeDocument);
+
+            var assembly = CompileToAssembly(generated, throwOnFailure: false);
+            // This has some errors
+            Assert.Collection(
+                assembly.Diagnostics.OrderBy(d => d.Id),
+                d => Assert.Equal("CS1503", d.Id));
         }
 
         [Fact]
@@ -618,6 +680,43 @@ namespace Test
             CompileToAssembly(generated);
         }
 
+        [Fact]
+        public void Regression_609()
+        {
+            // Arrange
+            AdditionalSyntaxTrees.Add(Parse(@"
+using System;
+using Microsoft.AspNetCore.Blazor.Components;
+
+namespace Test
+{
+    public class User : BlazorComponent
+    {
+        public string Name { get; set; }
+        public Action<string> NameChanged { get; set; }
+        public bool IsActive { get; set; }
+        public Action<bool> IsActiveChanged { get; set; }
+    }
+}
+"));
+
+            // Act
+            var generated = CompileToCSharp(@"
+@addTagHelper *, TestAssembly
+<User bind-Name=""@UserName"" bind-IsActive=""@UserIsActive"" />
+
+@functions {
+    public string UserName { get; set; }
+    public bool UserIsActive { get; set; }
+}
+");
+
+            // Assert
+            AssertDocumentNodeMatchesBaseline(generated.CodeDocument);
+            AssertCSharpDocumentMatchesBaseline(generated.CodeDocument);
+            CompileToAssembly(generated);
+        }
+
         [Fact] // https://github.com/aspnet/Blazor/issues/772
         public void Regression_772()
         {
@@ -660,6 +759,8 @@ Welcome to your new app.
         [Fact] // https://github.com/aspnet/Blazor/issues/773
         public void Regression_773()
         {
+            GenerateBaselines = true;
+
             // Arrange
             AdditionalSyntaxTrees.Add(Parse(@"
 using Microsoft.AspNetCore.Blazor.Components;
@@ -675,6 +776,7 @@ namespace Test
 
             // Act
             var generated = CompileToCSharp(@"
+@addTagHelper *, TestAssembly
 @page ""/""
 
 <h1>Hello, world!</h1>
@@ -687,6 +789,30 @@ Welcome to your new app.
             // Assert
             AssertDocumentNodeMatchesBaseline(generated.CodeDocument);
             AssertCSharpDocumentMatchesBaseline(generated.CodeDocument);
+            CompileToAssembly(generated);
+        }
+
+        [Fact]
+        public void Regression_784()
+        {
+            // Arrange
+
+            // Act
+            var generated = CompileToCSharp(@"
+<p onmouseover=""@OnComponentHover"" style=""background: @ParentBgColor;"" />
+@functions {
+    public string ParentBgColor { get; set; } = ""#FFFFFF"";
+
+    public void OnComponentHover(UIMouseEventArgs e)
+    {
+    }
+}
+");
+
+            // Assert
+            AssertDocumentNodeMatchesBaseline(generated.CodeDocument);
+            AssertCSharpDocumentMatchesBaseline(generated.CodeDocument);
+            CompileToAssembly(generated);
         }
 
         [Fact]
